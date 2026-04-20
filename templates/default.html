@@ -257,14 +257,11 @@
     flex: 1;
     overflow-y: auto;
     overflow-x: hidden;
-
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); /* better fit */
     gap: 20px;
-
-    padding: 24px 30px;
-    
-    align-items: start;      /* 🔥 prevents vertical stretching */
+    padding: 24px 30px;   
+    align-items: start; 
 }
 
 /* CARD */
@@ -273,30 +270,20 @@
     border-radius: 16px;
     overflow: hidden;
     cursor: pointer;
-
     width: 100%;
-    height: 320px;              /* 🔥 fixed height = no overlap */
-    
+    height: 320px;              /* 🔥 fixed height = no overlap */ 
     background: #1a0510 center/cover no-repeat;
     border: .5px solid rgba(192,24,90,.18);
-
     transition: border-color .3s, box-shadow .3s, transform .28s;
 }
-
-/* OPTIONAL: if you want responsive height instead */
-/*
 .gallery-thumb {
     aspect-ratio: 3/4;
 }
-*/
-
 .gallery-thumb:hover {
     border-color: rgba(212,168,67,.55);
     box-shadow: 0 10px 36px rgba(0,0,0,.6), 0 0 20px rgba(212,168,67,.12);
-
     transform: translateY(-5px); /* 🔥 removed scale to avoid overlap */
 }
-
 /* IMAGE OVERLAY */
 .gallery-thumb::before {
     content: '';
@@ -311,8 +298,6 @@
         transparent 80%
     );
 }
-
-/* TEXT CONTENT */
 .gallery-thumb-info {
     position: absolute;
     bottom: 0;
@@ -321,7 +306,6 @@
     z-index: 2;
     padding: 16px 18px;
 }
-
 /* SMALL TEXT FIX */
 .gallery-thumb-number {
     font-size: 10px;   /* 🔥 4px was too small */
@@ -329,7 +313,6 @@
     color: var(--gold);
     margin-bottom: 6px;
 }
-
 /* TITLE */
 .gallery-thumb-title {
     font-size: 16px;
@@ -357,6 +340,21 @@
     opacity: 1;
     color: rgba(248,243,236,.62);
 }
+
+/* Gallery lightbox */
+        #galleryLightbox { position: fixed; inset: 0; z-index: 300; display: none; background: rgba(4,10,6,0.97); backdrop-filter: blur(24px); }
+        #galleryLightbox.active { display: flex; align-items: center; justify-content: center; }
+        .glb-close { position: absolute; top: 24px; right: 24px; width: 42px; height: 42px; border-radius: 50%; background: rgba(255,255,255,.07); border: .5px solid rgba(255,255,255,.14); color: rgba(253,246,236,.55); font-size: 20px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all .2s; z-index: 10; }
+        .glb-close:hover { background: rgba(192,57,43,.25); border-color: rgba(192,57,43,.5); color: var(--cream); }
+        .glb-inner { display: flex; gap: 48px; max-width: 1100px; width: 95%; padding: 40px; }
+        .glb-img-wrap { flex: 1; max-width: 640px; border-radius: 18px; overflow: hidden; }
+        .glb-img-wrap img { width: 100%; height: 100%; object-fit: cover; display: block; }
+        .glb-content { flex: 1; display: flex; flex-direction: column; justify-content: center; padding: 20px 0; }
+        .glb-number { font-size: 10px; letter-spacing: .4em; text-transform: uppercase; color: rgba(240,192,64,.5); margin-bottom: 10px; }
+        .glb-title { font-family: 'Cormorant Garamond', serif; font-size: 38px; font-weight: 300; color: var(--cream); margin-bottom: 14px; line-height: 1.15; }
+        .glb-divider { height: .5px; background: linear-gradient(90deg, rgba(192,57,43,.5), transparent); margin-bottom: 18px; }
+        .glb-desc { font-size: 15px; color: rgba(253,246,236,.55); font-weight: 300; line-height: 1.7; }
+
         /* ══════════════════════════════════════════
            SHARED OVERLAY BASE STYLES
            (food, spa, bar all inherit from this pattern)
@@ -933,6 +931,192 @@
         /* ══════════════════════════════════════════
            MY ORDERS OVERLAY
         ══════════════════════════════════════════ */
+        /* ══════════════════════════════════════════
+           MEAL PLAN PICKER DIALOG
+        ══════════════════════════════════════════ */
+        #mealPlanDialog {
+            position: fixed; inset: 0; z-index: 300;
+            display: flex; align-items: center; justify-content: center;
+            background: rgba(0,0,0,.78);
+            backdrop-filter: blur(18px);
+            opacity: 0; visibility: hidden; pointer-events: none;
+            transition: opacity .35s ease, visibility .35s ease;
+        }
+        #mealPlanDialog.active {
+            opacity: 1; visibility: visible; pointer-events: all;
+        }
+        .mpd-modal {
+            width: min(660px, 94vw);
+            background: linear-gradient(160deg, rgba(18,4,12,0.99) 0%, rgba(8,2,5,0.99) 100%);
+            border: .5px solid rgba(192,24,90,.38);
+            border-radius: 22px;
+            padding: 36px 40px 32px;
+            position: relative;
+            overflow: hidden;
+        }
+        .mpd-modal::before {
+            content: '';
+            position: absolute; top: 0; left: 0; right: 0; height: 2px;
+            background: linear-gradient(90deg, transparent, var(--pink), var(--gold), transparent);
+        }
+        .mpd-close {
+            position: absolute; top: 16px; right: 18px;
+            background: none; border: none; color: rgba(248,243,236,.35);
+            font-size: 18px; cursor: pointer; line-height: 1;
+            transition: color .2s;
+        }
+        .mpd-close:hover { color: var(--cream); }
+        .mpd-eyebrow {
+            font-size: 9px; letter-spacing: .5em; text-transform: uppercase;
+            color: var(--gold); margin-bottom: 6px; font-weight: 400;
+        }
+        .mpd-heading {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 30px; font-weight: 300; color: var(--cream);
+            margin-bottom: 6px;
+        }
+        .mpd-heading em { color: var(--gold-light); font-style: italic; }
+        .mpd-sub {
+            font-size: 12px; color: rgba(248,243,236,.38); font-weight: 300;
+            margin-bottom: 24px; letter-spacing: .03em;
+        }
+        .mpd-current-row {
+            display: flex; align-items: center; gap: 10px;
+            background: rgba(192,24,90,.1); border: .5px solid rgba(192,24,90,.28);
+            border-radius: 10px; padding: 10px 16px; margin-bottom: 20px;
+        }
+        .mpd-current-dot {
+            width: 8px; height: 8px; border-radius: 50%;
+            background: var(--pink-light); flex-shrink: 0;
+            box-shadow: 0 0 8px var(--pink);
+        }
+        .mpd-current-label {
+            font-size: 11px; letter-spacing: .2em; text-transform: uppercase;
+            color: rgba(248,243,236,.38);
+        }
+        .mpd-current-name {
+            font-size: 14px; font-weight: 500; color: var(--pink-light);
+        }
+        .mpd-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+        .mpd-option {
+            background: rgba(20,4,12,0.85);
+            border: .5px solid rgba(255,255,255,.1);
+            border-radius: 14px; padding: 16px 18px;
+            cursor: pointer;
+            transition: border-color .25s, background .25s, box-shadow .25s, transform .2s;
+            position: relative; overflow: hidden;
+        }
+        .mpd-option::after {
+            content: '';
+            position: absolute; top: 0; left: 0; right: 0; height: 1.5px;
+            background: linear-gradient(90deg, transparent, var(--pink), transparent);
+            transform: scaleX(0); transform-origin: left;
+            transition: transform .35s ease;
+        }
+        .mpd-option:hover { border-color: rgba(192,24,90,.45); background: rgba(192,24,90,.08); transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,.4); }
+        .mpd-option:hover::after { transform: scaleX(1); }
+        .mpd-option.selected {
+            border-color: var(--pink); background: rgba(192,24,90,.18);
+            box-shadow: 0 0 0 1px rgba(192,24,90,.3), 0 8px 28px rgba(192,24,90,.15);
+        }
+        .mpd-option.selected::after { transform: scaleX(1); }
+        .mpd-opt-code {
+            font-size: 9px; letter-spacing: .45em; text-transform: uppercase;
+            color: var(--gold); margin-bottom: 5px; font-weight: 400;
+        }
+        .mpd-opt-name {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 20px; font-weight: 300; color: var(--cream); margin-bottom: 4px;
+        }
+        .mpd-opt-tag {
+            font-size: 11px; color: rgba(248,243,236,.48); font-weight: 300;
+            font-style: italic; margin-bottom: 8px;
+        }
+        .mpd-opt-pills {
+            display: flex; gap: 5px; flex-wrap: wrap;
+        }
+        .mpd-pill {
+            font-size: 9px; letter-spacing: .1em;
+            background: rgba(255,255,255,.07); border: .5px solid rgba(255,255,255,.12);
+            border-radius: 20px; padding: 2px 8px; color: rgba(248,243,236,.55);
+        }
+        .mpd-option.selected .mpd-pill {
+            background: rgba(192,24,90,.18); border-color: rgba(192,24,90,.4);
+            color: #f080a8;
+        }
+        .mpd-check {
+            position: absolute; top: 12px; right: 12px;
+            width: 20px; height: 20px; border-radius: 50%;
+            background: var(--pink); display: flex; align-items: center; justify-content: center;
+            font-size: 11px; color: #fff;
+            opacity: 0; transform: scale(0.5);
+            transition: opacity .2s, transform .2s;
+        }
+        .mpd-option.selected .mpd-check { opacity: 1; transform: scale(1); }
+        .mpd-actions { display: flex; gap: 12px; }
+        .mpd-cancel-btn {
+            flex: 1; padding: 13px;
+            background: rgba(255,255,255,.06); border: .5px solid rgba(255,255,255,.14);
+            color: rgba(248,243,236,.5); border-radius: 10px;
+            font-family: 'Jost', sans-serif; font-size: 12px;
+            letter-spacing: .22em; text-transform: uppercase; cursor: pointer;
+            transition: all .2s;
+        }
+        .mpd-cancel-btn:hover { background: rgba(255,255,255,.11); color: var(--cream); }
+        .mpd-confirm-btn {
+            flex: 2; padding: 13px;
+            background: linear-gradient(135deg, var(--pink), var(--pink-light));
+            border: none; color: #fff; border-radius: 10px;
+            font-family: 'Jost', sans-serif; font-size: 12px; font-weight: 600;
+            letter-spacing: .22em; text-transform: uppercase; cursor: pointer;
+            transition: opacity .25s, box-shadow .25s;
+        }
+        .mpd-confirm-btn:hover { opacity: .88; box-shadow: 0 0 24px rgba(192,24,90,.45); }
+        .mpd-confirm-btn:disabled { opacity: .3; cursor: default; box-shadow: none; }
+
+        /* ── My Bookings scroll arrows (up & down) ───────────── */
+        .mo-scroll-arrow {
+            position: fixed;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 200;
+            width: 44px; height: 44px;
+            border-radius: 50%;
+            background: rgba(20,4,10,0.82);
+            border: .5px solid rgba(212,168,67,.45);
+            color: var(--gold-light);
+            display: flex; align-items: center; justify-content: center;
+            cursor: pointer;
+            backdrop-filter: blur(8px);
+            transition: background .25s, border-color .25s, box-shadow .25s, opacity .3s;
+            opacity: 1;
+            pointer-events: all;
+        }
+        .mo-scroll-arrow svg {
+            width: 18px; height: 18px;
+            stroke: currentColor; stroke-width: 2;
+            fill: none; stroke-linecap: round; stroke-linejoin: round;
+            transition: transform .2s;
+        }
+        .mo-scroll-arrow:hover {
+            background: rgba(192,24,90,.35);
+            border-color: var(--pink-light);
+            color: #fff;
+            box-shadow: 0 0 18px rgba(192,24,90,.35);
+        }
+        .mo-scroll-arrow:hover svg { transform: scale(1.15); }
+        .mo-scroll-arrow.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+        #moScrollUp   { top: 24px; }
+        #moScrollDown { bottom: 24px; }
+
         #myOrdersOverlay {
             position: fixed; inset: 0; z-index: 100;
             display: flex; flex-direction: column;
@@ -1832,7 +2016,7 @@ function wifiCopy(elementId, btn) {
      Logic handled by common.js (openMyOrders, closeMyOrders, loadMyOrders)
 ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ -->
 <div id="myOrdersOverlay">
-    <div class="mo-panel">
+    <div class="mo-panel" id="moPanel">
         <div class="mo-header">
             <div class="mo-title">My <em>Bookings</em></div>
             <button class="overlay-close-btn" onclick="closeMyOrders()" title="Close">&#10005;</button>
@@ -1844,12 +2028,16 @@ function wifiCopy(elementId, btn) {
             <!-- content injected silently by JS — no static Loading text -->
         </div>
     </div>
+    <!-- Scroll arrows — same style as services › arrow -->
+    <button id="moScrollUp" class="mo-scroll-arrow hidden" onclick="moScrollStep(-1)" title="Scroll up">
+        <svg viewBox="0 0 24 24"><polyline points="18 15 12 9 6 15"/></svg>
+    </button>
+    <button id="moScrollDown" class="mo-scroll-arrow hidden" onclick="moScrollStep(1)" title="Scroll down">
+        <svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+    </button>
 </div>
 
-<!-- ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
-     GALLERY OVERLAY
-     Logic handled by common.js (openGalleryMenu, openGalleryLightbox…)
-░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ -->
+<!-- ░░░░░░░░░ GALLERY OVERLAY ░░░░░░░ -->
 <div class="overlay-base" id="galleryOverlay">
     <div class="overlay-topbar">
         <div class="overlay-topbar-left">
@@ -1916,88 +2104,7 @@ document.addEventListener('DOMContentLoaded', function() {
 <!-- ░░ SHARED: clock + room data + activities + services (auto-updates) ░░ -->
 <script src="/static/common.js"></script>
 
-<script>
-/* ══════════════════════════════════════════════════════════════
-   BLINK FIX — patches common.js behaviour AFTER it has loaded.
-
-   Root cause: common.js calls loadMyOrders() on init AND every
-   30 s regardless of whether the overlay is visible. Each call
-   sets innerHTML = "Loading…" which forces a full repaint of the
-   fixed overlay layer, causing the visible blink on the main screen.
-
-   Fix strategy:
-   1. Override window.loadMyOrders so it only runs when the overlay
-      is actually open (has class "active").
-   2. When the overlay IS open, skip the "Loading…" flash — fetch
-      silently and only swap innerHTML when real data arrives.
-   3. Cancel common.js's background interval and replace it with
-      our own that respects the visibility check.
-══════════════════════════════════════════════════════════════ */
-(function patchLoadMyOrders() {
-
-    /* Wait until common.js has finished defining window.loadMyOrders */
-    function applyPatch() {
-        var _origLoadMyOrders = window.loadMyOrders;
-        if (typeof _origLoadMyOrders !== 'function') {
-            /* common.js not ready yet — retry on next tick */
-            setTimeout(applyPatch, 50);
-            return;
-        }
-
-        /* Patched version: silent fetch, no "Loading…" flash,
-           only runs when overlay is visible.                    */
-        window.loadMyOrders = function loadMyOrdersPatched() {
-            var overlay = document.getElementById('myOrdersOverlay');
-            var container = document.getElementById('myOrdersContent');
-
-            /* If overlay is not open, do nothing — no DOM touching */
-            if (!overlay || !overlay.classList.contains('active')) return;
-            if (!container) return;
-
-            /* Fetch silently — do NOT touch innerHTML until data arrives */
-            if (!window.ROOM_NO) return;
-            fetch('/api/my-orders/' + window.ROOM_NO)
-                .then(function(r) { return r.json(); })
-                .then(function(data) {
-                    /* Only update if overlay is still open */
-                    if (!overlay.classList.contains('active')) return;
-                    _origLoadMyOrders();
-                })
-                .catch(function() {
-                    /* silent fail — don't blink on error either */
-                });
-        };
-
-        /* Cancel the background interval common.js already started
-           and replace with ours that uses the patched function.    */
-        var highId = setInterval(function(){}, 99999); /* get a high watermark */
-        clearInterval(highId);
-        /* Cancel every interval up to the current counter */
-        for (var i = 1; i <= highId; i++) { clearInterval(i); }
-
-        /* Re-register all the intervals common.js intended, but
-           now loadMyOrders is already patched so it's safe.    */
-        setInterval(window.loadMyOrders,   30000);  /* bookings  */
-        setInterval(window.loadServices,   30000);  /* services  */
-        setInterval(window.loadActivities, 10000);  /* activities*/
-        setInterval(window.loadRoomData,    5000);  /* room data */
-        /* Re-run a fresh tick so clock doesn't skip after interval reset */
-        var clockEl = document.getElementById('clockTime');
-        if (clockEl) {
-            var now = new Date();
-            clockEl.textContent = String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0');
-        }
-    }
-
-    /* Run patch after DOM + common.js are both ready */
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', function() { setTimeout(applyPatch, 0); });
-    } else {
-        setTimeout(applyPatch, 0);
-    }
-
-})();
-</script>
+<!-- Blink fix removed — loadMyOrders in common.js is now silent by design -->
 
 <script>
 /* ══════════════════════════════════════════════════════
@@ -2100,14 +2207,376 @@ document.addEventListener('DOMContentLoaded', function () {
 </script>
 
 <script>
-/* ── Hard refresh every 30 s — ensures room data, message, and
-   activities stay current even if the polling fetch stalls.
-   Preserves the room_no query param for the next load.       */
-setTimeout(function() {
-    window.location.href = window.location.href.split('?')[0]
-        + '?room_no=' + (window.ROOM_NO || '')
-        + '&t=' + Date.now();
-}, 30000);
+
+(function patchLoadMyOrders() {
+
+    /* Wait until common.js has finished defining window.loadMyOrders */
+    function applyPatch() {
+        var _origLoadMyOrders = window.loadMyOrders;
+        if (typeof _origLoadMyOrders !== 'function') {
+            /* common.js not ready yet — retry on next tick */
+            setTimeout(applyPatch, 50);
+            return;
+        }
+
+        /* Patched version: silent fetch, no "Loading…" flash,
+           only runs when overlay is visible.                    */
+        window.loadMyOrders = function loadMyOrdersPatched() {
+            var overlay = document.getElementById('myOrdersOverlay');
+            var container = document.getElementById('myOrdersContent');
+
+            /* If overlay is not open, do nothing — no DOM touching */
+            if (!overlay || !overlay.classList.contains('active')) return;
+            if (!container) return;
+
+            /* Fetch silently — do NOT touch innerHTML until data arrives */
+            if (!window.ROOM_NO) return;
+            fetch('/api/my-orders/' + window.ROOM_NO)
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    /* Only update if overlay is still open */
+                    if (!overlay.classList.contains('active')) return;
+                    _origLoadMyOrders();
+                })
+                .catch(function() {
+                    /* silent fail — don't blink on error either */
+                });
+        };
+
+        /* Cancel the background interval common.js already started
+           and replace with ours that uses the patched function.    */
+        var highId = setInterval(function(){}, 99999); /* get a high watermark */
+        clearInterval(highId);
+        /* Cancel every interval up to the current counter */
+        for (var i = 1; i <= highId; i++) { clearInterval(i); }
+
+        /* Re-register all the intervals common.js intended, but
+           now loadMyOrders is already patched so it's safe.    */
+        setInterval(window.loadMyOrders,   30000);  /* bookings  */
+        setInterval(window.loadServices,   30000);  /* services  */
+        setInterval(window.loadActivities, 10000);  /* activities*/
+        setInterval(window.loadRoomData,    5000);  /* room data */
+        /* clock is internal to common.js — tickClock runs on its own 10s interval */
+        /* Re-run a fresh tick so clock doesn't skip after interval reset */
+        var clockEl = document.getElementById('clockTime');
+        if (clockEl) {
+            var now = new Date();
+            clockEl.textContent = String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0');
+        }
+    }
+
+    /* Run patch after DOM + common.js are both ready */
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', function() { setTimeout(applyPatch, 0); });
+    } else {
+        setTimeout(applyPatch, 0);
+    }
+
+})();
+</script>
+
+<!-- ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░
+     MEAL PLAN PICKER DIALOG
+░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ -->
+<div id="mealPlanDialog">
+    <div class="mpd-modal">
+        <button class="mpd-close" onclick="closeMealPlanDialog()">&#10005;</button>
+        <div class="mpd-eyebrow">Meal Plan</div>
+        <div class="mpd-heading">Choose Your <em>Plan</em></div>
+        <div class="mpd-sub">Select a dining arrangement for your stay</div>
+
+        <div class="mpd-current-row">
+            <div class="mpd-current-dot"></div>
+            <span class="mpd-current-label">Current plan &nbsp;·&nbsp;</span>
+            <span class="mpd-current-name" id="mpdCurrentName">—</span>
+        </div>
+
+        <div class="mpd-grid">
+            <div class="mpd-option" data-code="AI" onclick="selectMealPlan(this)">
+                <div class="mpd-check">✓</div>
+                <div class="mpd-opt-code">AI</div>
+                <div class="mpd-opt-name">All Inclusive</div>
+                <div class="mpd-opt-tag">Everything covered</div>
+                <div class="mpd-opt-pills">
+                    <span class="mpd-pill">Breakfast</span>
+                    <span class="mpd-pill">Lunch</span>
+                    <span class="mpd-pill">Dinner</span>
+                    <span class="mpd-pill">Bar</span>
+                </div>
+            </div>
+            <div class="mpd-option" data-code="AP" onclick="selectMealPlan(this)">
+                <div class="mpd-check">✓</div>
+                <div class="mpd-opt-code">AP</div>
+                <div class="mpd-opt-name">Full Board</div>
+                <div class="mpd-opt-tag">Three meals daily</div>
+                <div class="mpd-opt-pills">
+                    <span class="mpd-pill">Breakfast</span>
+                    <span class="mpd-pill">Lunch</span>
+                    <span class="mpd-pill">Dinner</span>
+                </div>
+            </div>
+            <div class="mpd-option" data-code="MAP" onclick="selectMealPlan(this)">
+                <div class="mpd-check">✓</div>
+                <div class="mpd-opt-code">MAP</div>
+                <div class="mpd-opt-name">Half Board</div>
+                <div class="mpd-opt-tag">Room &amp; two meals</div>
+                <div class="mpd-opt-pills">
+                    <span class="mpd-pill">Breakfast</span>
+                    <span class="mpd-pill">Dinner</span>
+                </div>
+            </div>
+            <div class="mpd-option" data-code="CP" onclick="selectMealPlan(this)">
+                <div class="mpd-check">✓</div>
+                <div class="mpd-opt-code">CP</div>
+                <div class="mpd-opt-name">Breakfast Only</div>
+                <div class="mpd-opt-tag">Morning meal included</div>
+                <div class="mpd-opt-pills">
+                    <span class="mpd-pill">Breakfast</span>
+                </div>
+            </div>
+            <div class="mpd-option" data-code="EP" onclick="selectMealPlan(this)" style="grid-column: 1 / -1;">
+                <div class="mpd-check">✓</div>
+                <div class="mpd-opt-code">EP</div>
+                <div class="mpd-opt-name">Room Only</div>
+                <div class="mpd-opt-tag">No meals included</div>
+                <div class="mpd-opt-pills">
+                    <span class="mpd-pill">Pay per meal</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="mpd-actions">
+            <button class="mpd-cancel-btn" onclick="closeMealPlanDialog()">Cancel</button>
+            <button class="mpd-confirm-btn" id="mpdConfirmBtn" disabled onclick="confirmMealPlan()">Confirm Plan</button>
+        </div>
+    </div>
+</div>
+
+<script>
+/* ── Meal Plan Dialog ─────────────────────────────── */
+(function() {
+    var _selectedCode = null;
+    var _originalCode = null;
+
+    var PLAN_LABELS = {
+        'AI':  '🍽️ All Inclusive',
+        'AP':  '🍳 Full Board',
+        'MAP': '🥗 Half Board',
+        'CP':  '☕ Breakfast Only',
+        'EP':  '🛏️ Room Only'
+    };
+
+    window.openMealPlanDialog = function(currentCode, currentLabel) {
+        _originalCode = currentCode || null;
+        _selectedCode = null;
+
+        var displayLabel = currentLabel || PLAN_LABELS[currentCode] || '—';
+        var cur = document.getElementById('mpdCurrentName');
+        if (cur) cur.textContent = displayLabel;
+
+        document.querySelectorAll('.mpd-option').forEach(function(el) {
+            el.classList.toggle('selected', el.dataset.code === _originalCode);
+        });
+        var confirmBtn = document.getElementById('mpdConfirmBtn');
+        confirmBtn.disabled = true;
+        confirmBtn.textContent = 'Confirm Plan';
+
+        document.getElementById('mealPlanDialog').classList.add('active');
+    };
+
+    window.closeMealPlanDialog = function() {
+        document.getElementById('mealPlanDialog').classList.remove('active');
+    };
+
+    window.selectMealPlan = function(el) {
+        document.querySelectorAll('.mpd-option').forEach(function(o) { o.classList.remove('selected'); });
+        el.classList.add('selected');
+        _selectedCode = el.dataset.code;
+        document.getElementById('mpdConfirmBtn').disabled = (_selectedCode === _originalCode);
+    };
+
+    window.confirmMealPlan = function() {
+        if (!_selectedCode || _selectedCode === _originalCode) return;
+        var btn = document.getElementById('mpdConfirmBtn');
+        btn.disabled = true;
+        btn.textContent = 'Updating…';
+
+        /* Exact same API call as common.js changeMealPlan */
+        fetch('/api/update-meal-plan', {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body:    JSON.stringify({ room_no: window.ROOM_NO, meal_plan: _selectedCode })
+        })
+        .then(function(r) {
+            if (r.ok) {
+                closeMealPlanDialog();
+                var toast = document.getElementById('actToast');
+                if (toast) {
+                    toast.textContent = '✓ Meal plan updated!';
+                    toast.classList.add('show');
+                    setTimeout(function() {
+                        toast.classList.remove('show');
+                        toast.textContent = '✓ Reserved! See you at the activity 🎉';
+                    }, 3000);
+                }
+                if (typeof window.loadMyOrders === 'function') window.loadMyOrders();
+            } else {
+                btn.disabled = false;
+                btn.textContent = 'Confirm Plan';
+            }
+        })
+        .catch(function() {
+            btn.disabled = false;
+            btn.textContent = 'Confirm Plan';
+        });
+    };
+
+    /* ── Intercept the <select onchange="changeMealPlan(this.value)"> that
+          common.js injects into #myOrdersContent.
+          Strategy:
+            1. MutationObserver spots the <select> every time common.js re-renders
+            2. Hide the <select> and insert a styled "Change Plan" button
+            3. Button click reads the currently-selected plan from the <select>
+               and opens our dialog
+          We do NOT need to patch window.changeMealPlan because the <select>
+          is hidden — it can never fire its onchange.                        ── */
+
+    function interceptMealPlanSelect() {
+        var content = document.getElementById('myOrdersContent');
+        if (!content) return;
+
+        var sel = content.querySelector('select[onchange*="changeMealPlan"]');
+        if (!sel || sel._mpdPatched) return;
+        sel._mpdPatched = true;
+
+        /* Derive current plan code: look for the option that is pre-selected
+           (common.js sets `selected` on the matching option in the HTML string) */
+        var currentCode = '';
+        for (var i = 0; i < sel.options.length; i++) {
+            if (sel.options[i].value && sel.options[i].defaultSelected) {
+                currentCode = sel.options[i].value;
+                break;
+            }
+        }
+        if (!currentCode) {
+            /* fallback: scan text of the label div above the select */
+            var box = sel.closest('div');
+            if (box) {
+                var labelDiv = box.previousElementSibling;
+                if (labelDiv) {
+                    var txt = labelDiv.textContent || '';
+                    var codes = ['AI','AP','MAP','CP','EP'];
+                    for (var c = 0; c < codes.length; c++) {
+                        if (txt.indexOf(codes[c]) !== -1) { currentCode = codes[c]; break; }
+                    }
+                }
+            }
+        }
+
+        /* Hide native select */
+        sel.style.display = 'none';
+
+        /* Build trigger button */
+        var trigBtn = document.createElement('button');
+        trigBtn.style.cssText = 'background:rgba(192,24,90,.14);border:.5px solid rgba(192,24,90,.45);color:#f080a8;font-family:Jost,sans-serif;font-size:12px;letter-spacing:.18em;text-transform:uppercase;padding:8px 18px;border-radius:20px;cursor:pointer;display:inline-flex;align-items:center;gap:8px;transition:background .25s,box-shadow .25s;';
+        trigBtn.innerHTML = '<span>Change Plan</span> <span style="font-size:10px;opacity:.6;">&#9679;</span>';
+        trigBtn.onmouseenter = function() { this.style.background='rgba(192,24,90,.28)'; this.style.boxShadow='0 0 14px rgba(192,24,90,.25)'; };
+        trigBtn.onmouseleave = function() { this.style.background='rgba(192,24,90,.14)'; this.style.boxShadow='none'; };
+        trigBtn.onclick = function(e) {
+            e.stopPropagation();
+            /* Re-read current code each time in case the panel re-rendered */
+            var freshSel = document.querySelector('#myOrdersContent select[onchange*="changeMealPlan"]');
+            var code = currentCode;
+            if (freshSel) {
+                for (var j = 0; j < freshSel.options.length; j++) {
+                    if (freshSel.options[j].defaultSelected && freshSel.options[j].value) {
+                        code = freshSel.options[j].value; break;
+                    }
+                }
+            }
+            openMealPlanDialog(code, PLAN_LABELS[code] || code);
+        };
+
+        sel.parentNode.insertBefore(trigBtn, sel.nextSibling);
+    }
+
+    /* Watch #myOrdersContent — common.js re-renders on every poll cycle */
+    var observer = new MutationObserver(function() {
+        interceptMealPlanSelect();
+    });
+    document.addEventListener('DOMContentLoaded', function() {
+        var content = document.getElementById('myOrdersContent');
+        if (content) observer.observe(content, { childList: true, subtree: true });
+        interceptMealPlanSelect();
+    });
+})();
+</script>
+
+<script>
+// Soft background refresh — reloads data via existing poll functions
+// without navigating away, so open dropdowns / overlays are never interrupted.
+(function startSoftRefresh() {
+    var INTERVAL_MS = 30000; // every 30 s — same cadence as before
+
+    function softRefresh() {
+        try { if (typeof window.loadRoomData   === 'function') window.loadRoomData();   } catch(e){}
+        try { if (typeof window.loadMyOrders   === 'function') window.loadMyOrders();   } catch(e){}
+        try { if (typeof window.loadServices   === 'function') window.loadServices();   } catch(e){}
+        try { if (typeof window.loadActivities === 'function') window.loadActivities(); } catch(e){}
+    }
+
+    setInterval(softRefresh, INTERVAL_MS);
+})();
+/* ── My Bookings scroll arrows (up & down) ── */
+(function() {
+    var panel, btnUp, btnDown;
+
+    function init() {
+        panel   = document.getElementById('moPanel');
+        btnUp   = document.getElementById('moScrollUp');
+        btnDown = document.getElementById('moScrollDown');
+        if (!panel || !btnUp || !btnDown) return;
+        panel.addEventListener('scroll', updateArrows, { passive: true });
+        updateArrows();
+    }
+
+    function updateArrows() {
+        if (!panel || !btnUp || !btnDown) return;
+        var scrollTop  = panel.scrollTop;
+        var atTop      = scrollTop <= 4;
+        var atBottom   = scrollTop + panel.clientHeight >= panel.scrollHeight - 8;
+        atTop    ? btnUp.classList.add('hidden')    : btnUp.classList.remove('hidden');
+        atBottom ? btnDown.classList.add('hidden')  : btnDown.classList.remove('hidden');
+    }
+
+    window.moScrollStep = function(dir) {
+        if (!panel) return;
+        panel.scrollBy({ top: dir * 220, behavior: 'smooth' });
+    };
+
+    /* Show/hide when overlay opens or closes */
+    var overlay = document.getElementById('myOrdersOverlay');
+    if (overlay) {
+        new MutationObserver(function() {
+            if (overlay.classList.contains('active')) {
+                setTimeout(updateArrows, 120);
+            } else {
+                if (btnUp)   btnUp.classList.add('hidden');
+                if (btnDown) btnDown.classList.add('hidden');
+            }
+        }).observe(overlay, { attributes: true, attributeFilter: ['class'] });
+    }
+
+    /* Re-check after dynamic content is injected */
+    var content = document.getElementById('myOrdersContent');
+    if (content) {
+        new MutationObserver(function() { setTimeout(updateArrows, 80); })
+            .observe(content, { childList: true, subtree: true });
+    }
+
+    document.addEventListener('DOMContentLoaded', init);
+    window.addEventListener('load', init);
+})();
 </script>
 
 </body>

@@ -20,7 +20,8 @@ from .models import Template, Service, FoodItem, SpaItem, BarItem, DineItem, Ent
 from .booking_routes import router as booking_router   # NEW: booking/order endpoints
 import httpx 
 from .models import GroupBooking  
-from fastapi.responses import JSONResponse                                         # NEW: used by booking_routes for PMS sync
+from fastapi.responses import JSONResponse   
+from app.dashboard import router as dashboard_router
 
 
 models.Base.metadata.create_all(bind=engine)
@@ -31,6 +32,7 @@ with engine.connect() as _conn:
     for _sql in [
         "ALTER TABLE orders ADD COLUMN order_type VARCHAR(20) DEFAULT 'food'",
         "ALTER TABLE spa_bookings ADD COLUMN price INT DEFAULT 0",
+        "ALTER TABLE guests ADD COLUMN meal_plan VARCHAR(10) DEFAULT NULL",
     ]:
         try:
             _conn.execute(text(_sql))
@@ -41,6 +43,7 @@ with engine.connect() as _conn:
 
 app = FastAPI()
 app.include_router(booking_router)   # NEW: registers all /api/order, /api/spa-booking etc.
+app.include_router(dashboard_router) 
 
 templates = Jinja2Templates(directory="templates")
 app.mount("/static", StaticFiles(directory="static"), name="static")
@@ -126,7 +129,15 @@ def admin_dashboard(request: Request):
 
     total_active = len(active_guests)
 
-    active_theme = db.query(Template).filter(Template.status == "active").first()
+    # Auto-deactivate expired themes first
+    db.execute(text("UPDATE templates SET status='inactive' WHERE end_date < :today"), {"today": today})
+    db.commit()
+
+    active_theme = db.query(Template).filter(
+        Template.status == "active",
+        Template.start_date <= today,
+        Template.end_date >= today
+    ).first()
 
     db.close()
 
@@ -227,32 +238,42 @@ def add_tv(
 # =========================
 # WEBSOCKET FOR REALTIME TV STATUS
 # =========================
-
 @app.websocket("/ws/tv-status")
 async def websocket_tv_status(websocket: WebSocket):
     await websocket.accept()
 
-    while True:
-        db = SessionLocal()
-        tvs = db.query(models.TV).all()
-        data = []
+    try:
+        while True:
+            db = SessionLocal()
+            try:
+                tvs = db.query(models.TV).all()
+                data = []
 
-        for tv in tvs:
-            status = check_tv_status(tv.ip_address)
-            tv.status = status
-            data.append({
-                "room_no": tv.room_no,
-                "mac_address": tv.mac_address,
-                "ip_address": tv.ip_address,
-                "status": status,
-                "bound": tv.bound
-            })
+                for tv in tvs:
+                    status = check_tv_status(tv.ip_address)
+                    tv.status = status
+                    data.append({
+                        "room_no": tv.room_no,
+                        "mac_address": tv.mac_address,
+                        "ip_address": tv.ip_address,
+                        "status": status,
+                        "bound": tv.bound
+                    })
 
-        db.commit()
-        db.close()
+                db.commit()
+            except Exception as e:
+                db.rollback()
+                print(f"[TV WebSocket] DB error: {e}")
+            finally:
+                db.close()
 
-        await websocket.send_json(data)
-        await asyncio.sleep(5)
+            await websocket.send_json(data)
+            await asyncio.sleep(5)
+
+    except WebSocketDisconnect:
+        print(f"[TV WebSocket] Client disconnected — stopping TV status loop.")
+    except Exception as e:
+        print(f"[TV WebSocket] Unexpected error: {e}")
 
 
 # =========================
@@ -557,17 +578,16 @@ def tv_page(request: Request, room_no: int):
         }
     )
 
-
 @app.post("/discard_theme/{theme_id}")
 def discard_theme(theme_id: int):
     db = SessionLocal()
-
     db.execute(text("""
         UPDATE templates
-        SET status='inactive'
+        SET status='inactive',
+            start_date=NULL,
+            end_date=NULL
         WHERE id=:theme_id
     """), {"theme_id": theme_id})
-
     db.commit()
     db.close()
     return RedirectResponse("/themes", status_code=303)
@@ -575,6 +595,7 @@ def discard_theme(theme_id: int):
 
 @app.get("/api/room-data/{room_no}")
 async def get_room_data(room_no: int):
+    custom_message = room_messages.get(room_no, "Have a beautiful stay.")
     try:
         async with httpx.AsyncClient(timeout=5.0) as client:
             response = await client.get(
@@ -583,11 +604,11 @@ async def get_room_data(room_no: int):
             data = response.json()
             return {
                 "name": data.get("name", "Guest"),
-                "message": room_messages.get(room_no, "Have a beautiful stay.")  # ← this was removed!
+                "message": custom_message
             }
     except Exception as e:
         print("ERROR:", e)
-        return {"name": "Guest", "message": "Have a beautiful stay."}
+        return {"name": "Guest", "message": custom_message}  # ← always use room_messages
 
 
 # =========================
@@ -614,16 +635,19 @@ def add_activity(
 ):
     db = SessionLocal()
 
+    def to12hr(t):
+        if not t:
+            return ""
+        h, m = t.split(":")
+        h = int(h)
+        ampm = "PM" if h >= 12 else "AM"
+        h = h % 12 or 12
+        return f"{h}:{m} {ampm}"
+
     is_ann = (is_announcement == "on")
     time_slot = None
-
-    if not is_ann:
-        start = slot1.strip()
-        end   = slot1_end.strip()
-        if start and end:
-            time_slot = f"{start} - {end}"
-        elif start:
-            time_slot = start
+    if not is_ann and slot1 and slot1_end:
+        time_slot = f"{slot1} - {slot1_end}"
 
     activity = models.Activity(
         title=title,
@@ -1068,6 +1092,7 @@ def spa_category_covers():
 
 
 # ── BAR ───────────────────────────────────
+
 @app.post("/admin/bar/category-cover/{category}")
 async def bar_category_cover(category: str, image: UploadFile = File(...)):
     cover_dir = os.path.join(UPLOAD_DIR, "services", "bar", "covers")
@@ -1846,7 +1871,10 @@ def api_gallery_items():
         for i in items
     ]
 
-from datetime import date
+
+# =========================
+# GUEST INFO PAGE (ADMIN)
+# =========================
 
 @app.get("/admin/guests", response_class=HTMLResponse)
 def guest_info(request: Request):
@@ -1881,6 +1909,7 @@ def guest_info(request: Request):
         "upcoming_guests": upcoming_guests,
     })
 
+
 # =========================
 # DELETE GUEST BY ROOM (REST-style)
 # =========================
@@ -1894,7 +1923,6 @@ def delete_guest_by_id(room_no: int):
         if not guest:
             return {"message": "Guest not found"}
 
-        # ── Settle all pending bookings for this stay before deleting guest ──
         guest_name = guest.guest_name
         ci = guest.check_in
         if not isinstance(ci, datetime):
@@ -1915,10 +1943,9 @@ def delete_guest_by_id(room_no: int):
                 Model.status == "pending"
             ).all()
             for r in pending_records:
-                r.status = "confirmed"  # auto-confirm on checkout
+                r.status = "confirmed"
 
         db.commit()
-        # ─────────────────────────────────────────────────────────────────
 
         db.delete(guest)
         db.commit()
@@ -1932,15 +1959,10 @@ def delete_guest_by_id(room_no: int):
 
 # =========================
 # DELETE GUEST (POST /delete-guest)
-# Called by the frontend deleteGuest() JS function
 # =========================
 
 @app.post("/delete-guest")
 async def delete_guest_post(request: Request):
-    """
-    Accepts: { "room_no": 101 }
-    Deletes the currently active guest in that room and returns JSON.
-    """
     db = SessionLocal()
     try:
         data    = await request.json()
@@ -1954,7 +1976,6 @@ async def delete_guest_post(request: Request):
 
         today = date.today()
 
-        # Find the active guest for this room (checked-in and not yet checked out)
         guest = (
             db.query(models.Guest)
             .filter(
@@ -1965,7 +1986,6 @@ async def delete_guest_post(request: Request):
             .first()
         )
 
-        # If no active guest found, try finding any guest with that room number
         if not guest:
             guest = (
                 db.query(models.Guest)
@@ -1979,7 +1999,6 @@ async def delete_guest_post(request: Request):
                 content={"status": "error", "message": f"No guest found in room {room_no}"}
             )
 
-        # ── Settle all pending bookings for this stay before deleting guest ──
         guest_name = guest.guest_name
         ci = guest.check_in
         if not isinstance(ci, datetime):
@@ -2000,10 +2019,9 @@ async def delete_guest_post(request: Request):
                 Model.status == "pending"
             ).all()
             for r in pending_records:
-                r.status = "confirmed"  # auto-confirm on checkout
+                r.status = "confirmed"
 
         db.commit()
-        # ─────────────────────────────────────────────────────────────────
 
         db.delete(guest)
         db.commit()
@@ -2018,11 +2036,16 @@ async def delete_guest_post(request: Request):
     finally:
         db.close()
 
+
+# =========================
+# GROUP BOOKINGS PAGE (ADMIN)
+# =========================
+
 @app.get("/admin/groups", response_class=HTMLResponse)
 def admin_group_bookings(request: Request):
     db = SessionLocal()
     today = date.today()
-    all_groups = db.query(GroupBooking).all()  # ← fixed
+    all_groups = db.query(GroupBooking).all()
 
     active_groups = []
     past_groups = []
@@ -2053,18 +2076,85 @@ def admin_group_bookings(request: Request):
         "upcoming_groups": upcoming_groups,
     })
 
+
+# =========================
+# SEND GROUP MESSAGE
+# =========================
+
 @app.post("/send-group-message")
 def send_group_message(
     group_id: int = Form(...),
     room_numbers: str = Form(...),
     message: str = Form(...)
 ):
-    # Send message to all rooms in the group
     rooms = [r.strip() for r in room_numbers.split(',')]
     for room in rooms:
         try:
             room_messages[int(room)] = message
             print(f"✅ Group message set: room={room}, msg={message}")
-        except:
+        except Exception:
             pass
     return RedirectResponse("/admin/groups", status_code=303)
+
+
+# =========================
+# API: CURRENT GUESTS (for auto-refresh)
+# =========================
+
+@app.get("/api/guests/current")
+def api_current_guests():
+    db = SessionLocal()
+    today = date.today()
+    all_guests = db.query(models.Guest).all()
+
+    current_guests = []
+    for g in all_guests:
+        ci = g.check_in  if isinstance(g.check_in,  date) else date.fromisoformat(str(g.check_in))
+        co = g.check_out if isinstance(g.check_out, date) else date.fromisoformat(str(g.check_out))
+        if ci <= today <= co:
+            days_left = (co - today).days
+            current_guests.append({
+                "room_no":    g.room_no,
+                "guest_name": g.guest_name,
+                "check_in":   str(g.check_in),
+                "check_out":  str(g.check_out),
+                "days_left":  days_left
+            })
+
+    db.close()
+    return current_guests
+
+
+# =========================
+# API: CURRENT GROUPS (for auto-refresh)
+# =========================
+
+@app.get("/api/groups/current")
+def api_current_groups():
+    db = SessionLocal()
+    today = date.today()
+    all_groups = db.query(GroupBooking).all()
+
+    active_groups = []
+    for g in all_groups:
+        ci = g.check_in  if isinstance(g.check_in,  date) else date.fromisoformat(str(g.check_in))
+        co = g.check_out if isinstance(g.check_out, date) else date.fromisoformat(str(g.check_out))
+
+        if ci <= today <= co:
+            room_numbers_list = (
+                json.loads(g.room_numbers)
+                if isinstance(g.room_numbers, str)
+                else g.room_numbers
+            )
+            active_groups.append({
+                "id":               g.id,
+                "group_name":       g.group_name,
+                "welcome_message":  g.welcome_message or "",
+                "room_numbers_list": room_numbers_list,
+                "check_in":         str(g.check_in),
+                "check_out":        str(g.check_out),
+                "days_left":        (co - today).days,
+            })
+
+    db.close()
+    return active_groups

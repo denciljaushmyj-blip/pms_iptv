@@ -470,6 +470,26 @@ def my_orders(room_no: int):
                 models.DineBooking.room_no == room_no
             ).order_by(models.DineBooking.booked_at.desc()).all()
 
+        # ── Resolve meal_plan from guest record, then group booking, else None ──
+        meal_plan = None
+        if current_guest:
+            meal_plan = getattr(current_guest, 'meal_plan', None)
+        if not meal_plan:
+            today = date.today()
+            room_str = str(room_no)
+            groups = db.query(models.GroupBooking).filter(
+                models.GroupBooking.is_active == 1,
+                models.GroupBooking.check_out >= str(today)
+            ).all()
+            for grp in groups:
+                try:
+                    rooms = json.loads(grp.room_numbers) if isinstance(grp.room_numbers, str) else grp.room_numbers
+                except Exception:
+                    rooms = []
+                if room_str in rooms:
+                    meal_plan = getattr(grp, 'meal_plan', None)
+                    break
+
         BILLABLE   = ["confirmed", "delivered", "completed"]
         food_total = sum(o.total for o in orders if o.order_type == "food" and o.status in BILLABLE)
         bar_total  = sum(o.total for o in orders if o.order_type == "bar"  and o.status in BILLABLE)
@@ -551,7 +571,8 @@ def my_orders(room_no: int):
                     "booked_epoch": int(b.booked_at.timestamp() * 1000) if b.booked_at else 0
                 }
                 for b in dine
-            ]
+            ],
+            "meal_plan": meal_plan or None
         }
     finally:
         db.close()
@@ -850,6 +871,56 @@ def delete_guest(payload: DeleteGuestPayload, db: Session = Depends(get_db)):
 
 
 # ═══════════════════════════════════════════════════════════════════
+# 11b. UPDATE MEAL PLAN  —  POST /api/update-meal-plan
+#      Updates the meal_plan field on the active guest record for a
+#      given room. Falls back to the active group booking if no
+#      individual guest record is found.
+# ═══════════════════════════════════════════════════════════════════
+
+@router.post("/api/update-meal-plan")
+async def update_meal_plan(request: Request):
+    data      = await request.json()
+    room_no   = int(data.get("room_no", 0))
+    meal_plan = data.get("meal_plan", "")
+
+    db = SessionLocal()
+    try:
+        today = date.today()
+
+        guest = db.query(models.Guest).filter(
+            models.Guest.room_no   == room_no,
+            models.Guest.check_in  <= today,
+            models.Guest.check_out >= today
+        ).first()
+
+        if guest:
+            guest.meal_plan = meal_plan
+            db.commit()
+            return {"status": "success", "meal_plan": meal_plan}
+
+        # No individual guest — check group booking
+        groups = db.query(models.GroupBooking).filter(
+            models.GroupBooking.is_active == 1,
+            models.GroupBooking.check_out >= str(today)
+        ).all()
+        for group in groups:
+            rooms = json.loads(group.room_numbers) if isinstance(group.room_numbers, str) else group.room_numbers
+            if str(room_no) in rooms:
+                group.meal_plan = meal_plan
+                db.commit()
+                return {"status": "success", "meal_plan": meal_plan}
+
+        return {"status": "error", "message": "Guest not found"}
+
+    except Exception as e:
+        db.rollback()
+        return {"status": "error", "message": str(e)}
+
+    finally:
+        db.close()
+
+
+# ═══════════════════════════════════════════════════════════════════
 # 12.  GROUP SUMMARY  —  GET /api/group-summary/{room_no}
 #      Returns per-room charges for all rooms in the same group
 #      booking, plus a group grand total. Used by the TV page's
@@ -1012,48 +1083,5 @@ def debug_guest(room_no: int):
                 for g in all_guests
             ]
         }
-    finally:
-        db.close()
-
-@router.post("/api/update-meal-plan")
-async def update_meal_plan(request: Request):
-    data = await request.json()
-    room_no = int(data.get("room_no", 0))
-    meal_plan = data.get("meal_plan", "")
-
-    db = SessionLocal()
-    try:
-        today = date.today()
-
-        guest = db.query(models.Guest).filter(
-            models.Guest.room_no == room_no,
-            models.Guest.check_in <= today,
-            models.Guest.check_out >= today
-        ).first()
-
-        if guest:
-            guest.meal_plan = meal_plan
-            db.commit()
-            return {"status": "success", "meal_plan": meal_plan}
-
-        # No individual guest — check group booking
-        import json as _json
-        groups = db.query(models.GroupBooking).filter(
-            models.GroupBooking.is_active == 1,
-            models.GroupBooking.check_out >= str(today)
-        ).all()
-        for group in groups:
-            rooms = _json.loads(group.room_numbers) if isinstance(group.room_numbers, str) else group.room_numbers
-            if str(room_no) in rooms:
-                group.meal_plan = meal_plan
-                db.commit()
-                return {"status": "success", "meal_plan": meal_plan}
-
-        return {"status": "error", "message": "Guest not found"}
-
-    except Exception as e:
-        db.rollback()
-        return {"status": "error", "message": str(e)}
-
     finally:
         db.close()

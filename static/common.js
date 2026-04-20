@@ -8,13 +8,15 @@
         const dateEl = document.getElementById('clockDate')
         if (!timeEl && !dateEl) return
 
-        const now = new Date()
-        const hh  = String(now.getHours()).padStart(2, '0')
-        const mm  = String(now.getMinutes()).padStart(2, '0')
-        const D   = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday']
-        const M   = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+        const now  = new Date()
+        const h24  = now.getHours()
+        const mm   = String(now.getMinutes()).padStart(2, '0')
+        const ampm = h24 >= 12 ? 'pm' : 'am'
+        const h12  = String(h24 % 12 || 12).padStart(2, '0')
+        const D    = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday']
+        const M    = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
 
-        if (timeEl) timeEl.textContent = hh + ':' + mm
+        if (timeEl) timeEl.textContent = h12 + ':' + mm + ' ' + ampm
         if (dateEl) dateEl.textContent = D[now.getDay()] + ', ' + now.getDate() + ' ' + M[now.getMonth()]
     }
 
@@ -57,7 +59,8 @@
     }
 
     window.onload = () => {
-        loadRoomData()
+    loadRoomData()
+    setInterval(loadRoomData, 5000)  // poll every 5 seconds
     }
 
 

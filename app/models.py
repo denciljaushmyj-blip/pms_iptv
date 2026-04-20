@@ -218,6 +218,7 @@ class DineBooking(Base):
     item_title = Column(String, nullable=False)
     occasion   = Column(String, nullable=True)           # romantic / birthday / anniversary / etc.
     slot       = Column(String, nullable=False)
+    price      = Column(Integer, nullable=True)
     status     = Column(String, default="pending")
     booked_at  = Column(DateTime, default=datetime.now)
     group_id = Column(Integer, ForeignKey("group_bookings.id"), nullable=True)
@@ -261,3 +262,8 @@ class GroupBooking(Base):
     is_active       = Column(Integer)
     created_at      = Column(String(30))
     meal_plan       = Column(String(20), nullable=True)
+
+class HotelConfig(Base):
+    __tablename__ = "hotel_config"
+    key   = Column(String, primary_key=True)
+    value = Column(String)
