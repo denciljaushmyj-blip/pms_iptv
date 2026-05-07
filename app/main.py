@@ -22,6 +22,8 @@ import httpx
 from .models import GroupBooking  
 from fastapi.responses import JSONResponse   
 from app.dashboard import router as dashboard_router
+from .latency_middleware import LatencyMiddleware
+from .log_config import setup_logging
 
 
 models.Base.metadata.create_all(bind=engine)
@@ -42,6 +44,8 @@ with engine.connect() as _conn:
 
 
 app = FastAPI()
+setup_logging()                        # ← ADD
+app.add_middleware(LatencyMiddleware) 
 app.include_router(booking_router)   # NEW: registers all /api/order, /api/spa-booking etc.
 app.include_router(dashboard_router) 
 
@@ -633,7 +637,15 @@ def add_activity(
     slot1_end: str = Form(""),
     is_announcement: str = Form("off")
 ):
+    import urllib.parse as _ul
     db = SessionLocal()
+    exists = db.query(models.Activity).filter(
+        models.Activity.title.ilike(title.strip())
+    ).first()
+    if exists:
+        db.close()
+        msg = _ul.quote(f'"{title}" already exists in Activities.')
+        return RedirectResponse(f"/admin/activities?error={msg}", status_code=303)
 
     def to12hr(t):
         if not t:
@@ -650,7 +662,7 @@ def add_activity(
         time_slot = f"{slot1} - {slot1_end}"
 
     activity = models.Activity(
-        title=title,
+        title=title.strip(),
         time_slot=time_slot,
         is_announcement=is_ann
     )
@@ -658,6 +670,14 @@ def add_activity(
     db.commit()
     db.close()
     return RedirectResponse("/admin/activities", status_code=303)
+
+
+@app.get("/api/check-duplicate/activities")
+def check_dup_activities(title: str, db: Session = Depends(get_db)):
+    exists = db.query(models.Activity).filter(
+        models.Activity.title.ilike(title.strip())
+    ).first()
+    return {"duplicate": bool(exists)}
 
 
 @app.delete("/admin/activities/{activity_id}")
@@ -718,6 +738,28 @@ async def add_service(
         return RedirectResponse("/admin/services?error=no_image", status_code=303)
 
     db = SessionLocal()
+
+    # Reject duplicate/overlapping service names using word-token matching.
+    # Rule: if ANY meaningful word from the new title appears in ANY existing
+    # service title (or vice-versa), it is considered a duplicate.
+    # e.g. "Food Menu" blocks "food", "menu", "Food Bar", etc.
+    # e.g. "Spa & Wellness" blocks "spa", "wellness", "Spa Retreat", etc.
+    STOP_WORDS = {"and", "&", "the", "a", "an", "of", "for", "to", "in", "with"}
+
+    def significant_words(text: str) -> set:
+        """Return lowercase meaningful words, stripping punctuation."""
+        raw = re.sub(r"[^\w\s]", " ", text.lower())
+        return {w for w in raw.split() if w and w not in STOP_WORDS}
+
+    new_words = significant_words(title.strip())
+
+    all_services = db.query(models.Service).all()
+    for svc in all_services:
+        existing_words = significant_words(svc.title)
+        if new_words & existing_words:          # any word overlap → duplicate
+            db.close()
+            return RedirectResponse("/admin/services?error=duplicate", status_code=303)
+
     service_dir = os.path.join(UPLOAD_DIR, "services")
     os.makedirs(service_dir, exist_ok=True)
 
@@ -746,6 +788,33 @@ def delete_service(service_id: int):
     return {"message": "Deleted"}
 
 
+# Update service image only (called from hover-pencil in admin UI)
+@app.patch("/admin/services/{service_id}/image")
+async def update_service_image(
+    service_id: int,
+    image: UploadFile = File(...)
+):
+    db = SessionLocal()
+    service = db.query(models.Service).filter(models.Service.id == service_id).first()
+    if not service:
+        db.close()
+        return JSONResponse(status_code=404, content={"error": "Service not found"})
+
+    service_dir = os.path.join(UPLOAD_DIR, "services")
+    os.makedirs(service_dir, exist_ok=True)
+
+    filename  = title_filename(service.title, image.filename)
+    file_path = os.path.join(service_dir, filename)
+    with open(file_path, "wb") as f:
+        f.write(await image.read())
+
+    service.image_url = f"/static/images/services/{filename}"
+    db.commit()
+    new_url = service.image_url
+    db.close()
+    return JSONResponse(content={"image_url": new_url})
+
+
 # =========================
 # API FOR TV PAGE (SERVICES)
 # =========================
@@ -763,6 +832,37 @@ def get_services():
         }
         for s in services
     ]
+
+
+
+
+# =========================
+# API: CHECK DUPLICATE SERVICE NAME
+# =========================
+
+@app.get("/api/services/check-duplicate")
+def check_duplicate_service(title: str, db: Session = Depends(get_db)):
+    """
+    Returns {duplicate: true/false} based on word-token overlap with existing service names.
+    Used by the frontend for instant validation before form submit.
+    """
+    STOP_WORDS = {"and", "&", "the", "a", "an", "of", "for", "to", "in", "with"}
+
+    def significant_words(text: str) -> set:
+        raw = re.sub(r"[^\w\s]", " ", text.lower())
+        return {w for w in raw.split() if w and w not in STOP_WORDS}
+
+    new_words = significant_words(title.strip())
+    if not new_words:
+        return {"duplicate": False, "conflict_with": None}
+
+    all_services = db.query(models.Service).all()
+    for svc in all_services:
+        existing_words = significant_words(svc.title)
+        if new_words & existing_words:
+            return {"duplicate": True, "conflict_with": svc.title}
+
+    return {"duplicate": False, "conflict_with": None}
 
 
 # =========================
@@ -813,7 +913,16 @@ async def add_food_item(
     price: int = Form(...),
     image: Optional[UploadFile] = File(None)
 ):
+    import urllib.parse as _ul
     db = SessionLocal()
+    exists = db.query(models.FoodItem).filter(
+        models.FoodItem.title.ilike(title.strip())
+    ).first()
+    if exists:
+        db.close()
+        msg = _ul.quote(f'\{title}\ already exists in the {category} category.')
+        return RedirectResponse(f"/admin/food?category={category}&error={msg}", status_code=303)
+
     food_dir = os.path.join(UPLOAD_DIR, "services", "food_menu")
     os.makedirs(food_dir, exist_ok=True)
 
@@ -823,14 +932,21 @@ async def add_food_item(
         file_path = os.path.join(food_dir, filename)
         with open(file_path, "wb") as f:
             f.write(await image.read())
-
         image_url = f"/static/images/services/food_menu/{filename}"
 
-    item = models.FoodItem(title=title, category=category, price=price, image_url=image_url)
+    item = models.FoodItem(title=title.strip(), category=category, price=price, image_url=image_url)
     db.add(item)
     db.commit()
     db.close()
     return RedirectResponse(f"/admin/food?category={category}", status_code=303)
+
+
+@app.get("/api/check-duplicate/food")
+def check_dup_food(title: str, category: str, db: Session = Depends(get_db)):
+    exists = db.query(models.FoodItem).filter(
+        models.FoodItem.title.ilike(title.strip())
+    ).first()
+    return {"duplicate": bool(exists)}
 
 
 @app.delete("/admin/food/{item_id}")
@@ -911,7 +1027,16 @@ async def add_spa_item(
     slot3: str = Form(""),
     image: Optional[UploadFile] = File(None)
 ):
+    import urllib.parse as _ul
     db = SessionLocal()
+    exists = db.query(models.SpaItem).filter(
+        models.SpaItem.title.ilike(title.strip())
+    ).first()
+    if exists:
+        db.close()
+        msg = _ul.quote(f'"{title}" already exists in the spa menu.')
+        return RedirectResponse(f"/admin/spa?category={category}&error={msg}", status_code=303)
+
     spa_dir = os.path.join(UPLOAD_DIR, "services", "spa")
     os.makedirs(spa_dir, exist_ok=True)
 
@@ -924,7 +1049,7 @@ async def add_spa_item(
         image_url = f"/static/images/services/spa/{filename}"
 
     item = models.SpaItem(
-        title=title, category=category,
+        title=title.strip(), category=category,
         price=price,
         slot1=slot1,
         slot2=slot2 or None,
@@ -935,6 +1060,14 @@ async def add_spa_item(
     db.commit()
     db.close()
     return RedirectResponse(f"/admin/spa?category={category}", status_code=303)
+
+
+@app.get("/api/check-duplicate/spa")
+def check_dup_spa(title: str, category: str, db: Session = Depends(get_db)):
+    exists = db.query(models.SpaItem).filter(
+        models.SpaItem.title.ilike(title.strip())
+    ).first()
+    return {"duplicate": bool(exists)}
 
 
 @app.delete("/admin/spa/{item_id}")
@@ -1150,7 +1283,16 @@ async def add_bar_item(
     price: int = Form(...),
     image: Optional[UploadFile] = File(None)
 ):
+    import urllib.parse as _ul
     db = SessionLocal()
+    exists = db.query(models.BarItem).filter(
+        models.BarItem.title.ilike(title.strip())
+    ).first()
+    if exists:
+        db.close()
+        msg = _ul.quote(f'"{title}" already exists in the bar menu.')
+        return RedirectResponse(f"/admin/bar?category={category}&error={msg}", status_code=303)
+
     bar_dir = os.path.join(UPLOAD_DIR, "services", "bar")
     os.makedirs(bar_dir, exist_ok=True)
 
@@ -1162,11 +1304,19 @@ async def add_bar_item(
             f.write(await image.read())
         image_url = f"/static/images/services/bar/{filename}"
 
-    item = models.BarItem(title=title, category=category, price=price, image_url=image_url)
+    item = models.BarItem(title=title.strip(), category=category, price=price, image_url=image_url)
     db.add(item)
     db.commit()
     db.close()
     return RedirectResponse(f"/admin/bar?category={category}", status_code=303)
+
+
+@app.get("/api/check-duplicate/bar")
+def check_dup_bar(title: str, category: str, db: Session = Depends(get_db)):
+    exists = db.query(models.BarItem).filter(
+        models.BarItem.title.ilike(title.strip())
+    ).first()
+    return {"duplicate": bool(exists)}
 
 
 @app.delete("/admin/bar/{item_id}")
@@ -1261,7 +1411,16 @@ async def add_dine_item(
     slot3: str = Form(""),
     image: Optional[UploadFile] = File(None)
 ):
+    import urllib.parse as _ul
     db = SessionLocal()
+    exists = db.query(models.DineItem).filter(
+        models.DineItem.title.ilike(title.strip())
+    ).first()
+    if exists:
+        db.close()
+        msg = _ul.quote(f'"{title}" already exists in the dine-in menu.')
+        return RedirectResponse(f"/admin/dine?occasion={occasion}&error={msg}", status_code=303)
+
     dine_dir = os.path.join(UPLOAD_DIR, "services", "dine")
     os.makedirs(dine_dir, exist_ok=True)
 
@@ -1274,7 +1433,7 @@ async def add_dine_item(
         image_url = f"/static/images/services/dine/{filename}"
 
     item = models.DineItem(
-        title=title, occasion=occasion,
+        title=title.strip(), occasion=occasion,
         description=description or None,
         slot1=slot1 or None, slot2=slot2 or None, slot3=slot3 or None,
         image_url=image_url
@@ -1283,6 +1442,14 @@ async def add_dine_item(
     db.commit()
     db.close()
     return RedirectResponse(f"/admin/dine?occasion={occasion}", status_code=303)
+
+
+@app.get("/api/check-duplicate/dine")
+def check_dup_dine(title: str, occasion: str, db: Session = Depends(get_db)):
+    exists = db.query(models.DineItem).filter(
+        models.DineItem.title.ilike(title.strip())
+    ).first()
+    return {"duplicate": bool(exists)}
 
 
 @app.delete("/admin/dine/{item_id}")
@@ -1426,7 +1593,16 @@ async def add_entertainment_item(
     slot3: str = Form(""),
     image: Optional[UploadFile] = File(None)
 ):
+    import urllib.parse as _ul
     db = SessionLocal()
+    exists = db.query(models.EntertainmentItem).filter(
+        models.EntertainmentItem.title.ilike(title.strip())
+    ).first()
+    if exists:
+        db.close()
+        msg = _ul.quote(f'"{title}" already exists in the entertainment menu.')
+        return RedirectResponse(f"/admin/entertainment?category={category}&error={msg}", status_code=303)
+
     ent_dir = os.path.join(UPLOAD_DIR, "services", "entertainment")
     os.makedirs(ent_dir, exist_ok=True)
 
@@ -1439,7 +1615,7 @@ async def add_entertainment_item(
         image_url = f"/static/images/services/entertainment/{filename}"
 
     item = models.EntertainmentItem(
-        title=title, category=category,
+        title=title.strip(), category=category,
         price=price,
         venue=venue or None,
         slot1=slot1 or None,
@@ -1451,6 +1627,14 @@ async def add_entertainment_item(
     db.commit()
     db.close()
     return RedirectResponse(f"/admin/entertainment?category={category}", status_code=303)
+
+
+@app.get("/api/check-duplicate/entertainment")
+def check_dup_entertainment(title: str, category: str, db: Session = Depends(get_db)):
+    exists = db.query(models.EntertainmentItem).filter(
+        models.EntertainmentItem.title.ilike(title.strip())
+    ).first()
+    return {"duplicate": bool(exists)}
 
 
 @app.delete("/admin/entertainment/{item_id}")
@@ -1597,7 +1781,16 @@ async def add_room_service_item(
     icon:        str           = Form("🧹"),
     image:       Optional[UploadFile] = File(None)
 ):
+    import urllib.parse as _ul
     db = SessionLocal()
+    exists = db.query(models.RoomServiceItem).filter(
+        models.RoomServiceItem.title.ilike(title.strip())
+    ).first()
+    if exists:
+        db.close()
+        msg = _ul.quote(f'"{title}" already exists in Room Services.')
+        return RedirectResponse(f"/admin/room-services?error={msg}", status_code=303)
+
     rs_dir = os.path.join(UPLOAD_DIR, "services", "room_services")
     os.makedirs(rs_dir, exist_ok=True)
 
@@ -1610,7 +1803,7 @@ async def add_room_service_item(
         image_url = f"/static/images/services/room_services/{filename}"
 
     item = models.RoomServiceItem(
-        title=title,
+        title=title.strip(),
         description=description or None,
         icon=icon or "🧹",
         image_url=image_url,
@@ -1620,6 +1813,14 @@ async def add_room_service_item(
     db.commit()
     db.close()
     return RedirectResponse("/admin/room-services", status_code=303)
+
+
+@app.get("/api/check-duplicate/room-services")
+def check_dup_room_services(title: str, db: Session = Depends(get_db)):
+    exists = db.query(models.RoomServiceItem).filter(
+        models.RoomServiceItem.title.ilike(title.strip())
+    ).first()
+    return {"duplicate": bool(exists)}
 
 
 @app.delete("/admin/room-services/{item_id}")
@@ -1668,12 +1869,27 @@ async def edit_room_service_item(
 @app.post("/admin/room-services/toggle/{item_id}")
 def toggle_room_service_item(item_id: int):
     db = SessionLocal()
-    item = db.query(models.RoomServiceItem).filter(models.RoomServiceItem.id == item_id).first()
-    if item:
-        item.is_active = not item.is_active
+
+    try:
+        item = db.query(models.RoomServiceItem).filter(
+            models.RoomServiceItem.id == item_id
+        ).first()
+
+        if not item:
+            return {"message": "Item not found", "is_active": None}
+
+        new_status = not item.is_active
+        item.is_active = new_status
+
         db.commit()
-    db.close()
-    return {"message": "Toggled", "is_active": item.is_active if item else None}
+
+        return {
+            "message": "Toggled",
+            "is_active": new_status
+        }
+
+    finally:
+        db.close()
 
 
 # =========================
