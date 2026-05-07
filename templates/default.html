@@ -54,7 +54,7 @@
         .vibe-logo { display: inline-flex; align-items: center; gap: 10px; }
         .logo-diamond { width: 28px; height: 28px; background: var(--pink); clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
         .logo-diamond::after { content: 'V'; font-family: 'Cormorant Garamond', serif; font-size: 14px; color: #fff; font-weight: 600; }
-        .guest-name { font-family: 'Cormorant Garamond', serif; font-size: 60px; font-weight: 300; line-height: 1.0; color: var(--cream); }
+        .guest-name { font-family: 'Cormorant Garamond', serif; font-size: 60px; font-weight: 300; line-height: 1.0; color: var(--cream); white-space: nowrap; }
         .guest-name em { font-style: italic; color: var(--gold-light); }
         .room-info { margin-top: 12px; display: flex; align-items: center; gap: 14px; }
         .room-chip { background: var(--pink-dim); border: .5px solid var(--pink-light); color: var(--pink-light); font-size: 11px; letter-spacing: .18em; padding: 5px 14px; border-radius: 20px; }
@@ -2579,7 +2579,7 @@ document.addEventListener('DOMContentLoaded', function () {
 })();
 </script>
 
-<script src="/static/latency_tracker.js"></script>
+<script src="/static/js/latency_tracker.js"></script>
 
 </body>
 </html>

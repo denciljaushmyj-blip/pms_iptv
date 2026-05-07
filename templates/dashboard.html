@@ -182,6 +182,12 @@
             letter-spacing: -0.4px;
         }
 
+        /* ── AVATAR DROPDOWN ── */
+        .avatar-wrap {
+            position: relative;
+            display: inline-block;
+        }
+
         .avatar {
             width: 38px; height: 38px;
             background: linear-gradient(135deg, var(--accent), #c41f62);
@@ -189,6 +195,97 @@
             display: flex; align-items: center; justify-content: center;
             font-weight: 700; font-size: 14px; color: #fff;
             box-shadow: 0 2px 10px rgba(164,23,79,0.35);
+            cursor: pointer;
+            transition: box-shadow 0.2s, transform 0.15s;
+            user-select: none;
+        }
+
+        .avatar:hover {
+            box-shadow: 0 4px 16px rgba(164,23,79,0.5);
+            transform: scale(1.07);
+        }
+
+        .avatar-dropdown {
+            position: absolute;
+            top: calc(100% + 10px);
+            right: 0;
+            background: #ffffff;
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            box-shadow: 0 12px 40px rgba(61,8,32,0.18), 0 2px 8px rgba(61,8,32,0.08);
+            min-width: 200px;
+            overflow: hidden;
+            opacity: 0;
+            transform: translateY(-8px) scale(0.97);
+            pointer-events: none;
+            transition: opacity 0.2s ease, transform 0.2s ease;
+            z-index: 500;
+        }
+
+        .avatar-dropdown.open {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+            pointer-events: auto;
+        }
+
+        .avatar-dropdown-header {
+            padding: 16px 18px 12px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .avatar-dropdown-icon {
+            width: 40px; height: 40px;
+            background: linear-gradient(135deg, var(--accent), #c41f62);
+            border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-weight: 700; font-size: 15px; color: #fff;
+            flex-shrink: 0;
+            box-shadow: 0 3px 10px rgba(164,23,79,0.3);
+        }
+
+        .avatar-dropdown-info strong {
+            display: block;
+            font-size: 14px;
+            font-weight: 700;
+            color: var(--text);
+        }
+
+        .avatar-dropdown-info span {
+            font-size: 11px;
+            color: var(--muted);
+            letter-spacing: 0.5px;
+        }
+
+        .avatar-dropdown-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 12px 18px;
+            font-size: 13px;
+            font-weight: 600;
+            color: #c0392b;
+            cursor: pointer;
+            transition: background 0.13s;
+            border: none;
+            background: none;
+            width: 100%;
+            font-family: 'Plus Jakarta Sans', Arial, sans-serif;
+            text-align: left;
+        }
+
+        .avatar-dropdown-item:hover {
+            background: rgba(231,76,60,0.07);
+        }
+
+        .avatar-dropdown-item .item-icon {
+            width: 28px; height: 28px;
+            background: rgba(231,76,60,0.09);
+            border-radius: 7px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 14px;
         }
 
         /* ── STAT CARDS ── */
@@ -1160,6 +1257,27 @@ document.addEventListener('DOMContentLoaded', function() {
         setInterval(loadDashCharts, 30000);     // refresh charts independently every 30s
     }
 });
+
+// ── AVATAR DROPDOWN ──
+function toggleAvatarMenu(e) {
+    e.stopPropagation();
+    var dd = document.getElementById('avatar-dropdown');
+    if (dd) dd.classList.toggle('open');
+}
+
+// Close dropdown when clicking outside
+document.addEventListener('click', function() {
+    var dd = document.getElementById('avatar-dropdown');
+    if (dd) dd.classList.remove('open');
+});
+
+// ── LOGOUT ──
+async function doLogout() {
+    await fetch('/api/admin/logout', { method: 'POST' });
+    var dd = document.getElementById('avatar-dropdown');
+    if (dd) dd.classList.remove('open');
+    window.location.href = '/admin/login';
+}
 </script>
 
 <!-- ══════════════════════════════════════════
@@ -1250,7 +1368,23 @@ document.addEventListener('DOMContentLoaded', function() {
                     title="Toggle Light/Dark Theme">
                 🌙
             </button>
-            <div class="avatar">A</div>
+            <!-- Avatar with Dropdown -->
+            <div class="avatar-wrap">
+                <div class="avatar" onclick="toggleAvatarMenu(event)" title="Account">A</div>
+                <div class="avatar-dropdown" id="avatar-dropdown">
+                    <div class="avatar-dropdown-header">
+                        <div class="avatar-dropdown-icon">A</div>
+                        <div class="avatar-dropdown-info">
+                            <strong>Administrator</strong>
+                            <span>Admin Console</span>
+                        </div>
+                    </div>
+                    <button class="avatar-dropdown-item" onclick="doLogout()">
+                        <span class="item-icon">🚪</span>
+                        Logout
+                    </button>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -2097,6 +2231,84 @@ document.addEventListener('DOMContentLoaded', function() {
         <p>No items yet. Add one above.</p>
     </div>
     {% endif %}
+
+    <!-- ══════════════════════════════════════════
+         FOOD MENU CARD UPLOAD
+         ══════════════════════════════════════════ -->
+    <div style="margin-top:32px;">
+        <div class="cat-section-header">
+            <h3>📋 Food Menu Card</h3>
+        </div>
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:24px;box-shadow:0 2px 12px rgba(122,16,64,0.06);">
+            <p style="font-size:13px;color:var(--muted);margin-bottom:18px;">
+                Upload a PDF or image of your food menu card. Guests can view this by tapping <strong>"View Menu Card"</strong> in the food service panel.
+            </p>
+
+            <!-- Current Menu Card -->
+            <div id="current-menu-card-wrap" style="{% if not menu_card_url %}display:none;{% endif %}margin-bottom:20px;padding:16px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;">
+                <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.9px;color:var(--muted);margin-bottom:10px;">Current Menu Card</div>
+                <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
+                    <div id="menu-card-thumb" style="width:72px;height:52px;border-radius:8px;background:var(--border);display:flex;align-items:center;justify-content:center;font-size:26px;overflow:hidden;flex-shrink:0;">
+                        {% if menu_card_url %}
+                            {% if menu_card_url.endswith('.pdf') %}
+                                📄
+                            {% else %}
+                                <img src="{{ menu_card_url }}" style="width:100%;height:100%;object-fit:cover;">
+                            {% endif %}
+                        {% else %}
+                            📄
+                        {% endif %}
+                    </div>
+                    <div style="flex:1;min-width:0;">
+                        <div id="menu-card-filename" style="font-size:14px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+                            {% if menu_card_url %}{{ menu_card_url.split('/')[-1] }}{% endif %}
+                        </div>
+                        <div id="menu-card-updated" style="font-size:12px;color:var(--muted);margin-top:2px;">
+                            {% if menu_card_updated_at %}Last updated: {{ menu_card_updated_at }}{% endif %}
+                        </div>
+                    </div>
+                    <div style="display:flex;gap:8px;flex-shrink:0;">
+                        {% if menu_card_url %}
+                        <a href="{{ menu_card_url }}" target="_blank" class="btn btn-info btn-sm">👁️ View</a>
+                        {% endif %}
+                        <button class="btn btn-danger btn-sm" onclick="deleteMenuCard()">🗑️ Delete</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Upload Zone -->
+            <form id="menu-card-form" action="/admin/food/menu-card/upload" method="post" enctype="multipart/form-data">
+                <div style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;">
+                    <div style="flex:1;min-width:220px;">
+                        <label class="file-upload-zone" id="menu-card-zone"
+                               ondragover="this.classList.add('drag-over')" ondragleave="this.classList.remove('drag-over')"
+                               style="height:52px;">
+                            <span class="file-upload-icon" id="menu-card-zone-icon">📋</span>
+                            <div class="file-upload-texts">
+                                <span class="file-upload-text" id="menu-card-zone-text">Choose or Drop Menu Card</span>
+                                <span class="file-upload-hint">PDF, PNG, JPG — Max 10 MB</span>
+                                <span class="file-upload-chosen" id="menu-card-filename-chosen"></span>
+                            </div>
+                            <input type="file" name="menu_card" id="menu-card-input" accept=".pdf,image/*" required
+                                   onchange="onMenuCardSelected(this)">
+                        </label>
+                    </div>
+                    <button type="submit" class="btn btn-primary" id="menu-card-upload-btn" style="flex-shrink:0;white-space:nowrap;height:52px;padding:0 20px;" disabled>
+                        ⬆️ Upload Menu Card
+                    </button>
+                </div>
+
+                <!-- Preview (images only) -->
+                <div id="menu-card-preview-wrap" style="display:none;margin-top:14px;">
+                    <div style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.8px;color:var(--muted);margin-bottom:6px;">Preview</div>
+                    <img id="menu-card-preview-img" src="" style="max-width:260px;max-height:160px;border-radius:10px;border:2px solid var(--accent);object-fit:contain;">
+                </div>
+            </form>
+
+            <!-- Success / Error toast -->
+            <div id="menu-card-toast" style="display:none;margin-top:14px;padding:10px 16px;border-radius:8px;font-size:13px;font-weight:600;"></div>
+        </div>
+    </div>
 
     <!-- ══════════════════════════════════════════
          SPA & WELLNESS
@@ -4393,9 +4605,17 @@ if (tvTable) {
         let data = JSON.parse(event.data);
         let tbody = document.getElementById("tv-table-body");
         if (!tbody) return;
-        tbody.innerHTML = "";
 
+        /* Build a map of existing rows by room_no to avoid full rebuild flicker */
+        let existingRows = {};
+        tbody.querySelectorAll('tr').forEach(function(row) {
+            var cell = row.querySelector('td strong');
+            if (cell) existingRows[cell.textContent.replace('#','').trim()] = row;
+        });
+
+        let newRooms = {};
         data.forEach(tv => {
+            newRooms[tv.room_no] = true;
             let statusBadge = tv.status === "ONLINE"
                 ? `<span class="badge badge-online">Online</span>`
                 : `<span class="badge badge-offline">Offline</span>`;
@@ -4408,8 +4628,14 @@ if (tvTable) {
                 ? `<button class="btn btn-info btn-sm" onclick="unbindDevice('${tv.room_no}')">Unbind</button>`
                 : `<button class="btn btn-success btn-sm" onclick="bindDevice('${tv.room_no}')">Bind</button>`;
 
-            tbody.innerHTML += `
-            <tr>
+            if (existingRows[tv.room_no]) {
+                /* Row exists — only update STATUS cell (index 3), skip bind to avoid overwriting optimistic UI */
+                let tds = existingRows[tv.room_no].querySelectorAll('td');
+                if (tds[3]) tds[3].innerHTML = statusBadge;
+            } else {
+                /* New row — append it */
+                let tr = document.createElement('tr');
+                tr.innerHTML = `
                 <td><strong>#${tv.room_no}</strong></td>
                 <td><code style="font-size:12px;color:#9a6478;">${tv.mac_address}</code></td>
                 <td><code style="font-size:12px;color:#9a6478;">${tv.ip_address}</code></td>
@@ -4420,8 +4646,14 @@ if (tvTable) {
                         ${bindBtn}
                         <button class="btn btn-danger btn-sm" onclick="deleteDevice('${tv.room_no}')">Delete</button>
                     </div>
-                </td>
-            </tr>`;
+                </td>`;
+                tbody.appendChild(tr);
+            }
+        });
+
+        /* Remove rows for devices that no longer exist */
+        Object.keys(existingRows).forEach(function(room) {
+            if (!newRooms[room]) existingRows[room].remove();
         });
     };
 
@@ -4429,20 +4661,69 @@ if (tvTable) {
     ws.onclose = () => console.log("WebSocket closed");
 }
 
-async function bindDevice(room) {
-    await fetch("/bind_device", {
-        method: "POST",
-        headers: {"Content-Type": "application/json"},
-        body: JSON.stringify({room})
+/* ── Instantly update the Bind/Unbind row in DOM — no page reload, no waiting for WebSocket ── */
+function _updateBindRow(room, isBound) {
+    var rows = document.querySelectorAll('#tv-table-body tr');
+    rows.forEach(function(row) {
+        var roomCell = row.querySelector('td strong');
+        if (!roomCell) return;
+        if (roomCell.textContent.trim() !== '#' + room) return;
+
+        /* Update binding badge (5th td = index 4) */
+        var tds = row.querySelectorAll('td');
+        if (tds[4]) {
+            tds[4].innerHTML = isBound
+                ? '<span class="badge badge-bound">Bound</span>'
+                : '<span class="badge badge-unbound">Unbound</span>';
+        }
+
+        /* Update action button */
+        var btnRow = row.querySelector('.btn-row');
+        if (btnRow) {
+            var existingBind = btnRow.querySelector('.btn-info, .btn-success');
+            if (existingBind) {
+                if (isBound) {
+                    existingBind.className = 'btn btn-info btn-sm';
+                    existingBind.textContent = 'Unbind';
+                    existingBind.setAttribute('onclick', "unbindDevice('" + room + "')");
+                } else {
+                    existingBind.className = 'btn btn-success btn-sm';
+                    existingBind.textContent = 'Bind';
+                    existingBind.setAttribute('onclick', "bindDevice('" + room + "')");
+                }
+            }
+        }
     });
 }
 
+async function bindDevice(room) {
+    /* Instant UI update — feels millisecond fast */
+    _updateBindRow(room, true);
+    try {
+        await fetch("/bind_device", {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({room})
+        });
+    } catch(e) {
+        /* Revert if request failed */
+        _updateBindRow(room, false);
+    }
+}
+
 async function unbindDevice(room) {
-    await fetch("/unbind_device", {
-        method: "POST",
-        headers: {"Content-Type": "application/json"},
-        body: JSON.stringify({room})
-    });
+    /* Instant UI update — feels millisecond fast */
+    _updateBindRow(room, false);
+    try {
+        await fetch("/unbind_device", {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({room})
+        });
+    } catch(e) {
+        /* Revert if request failed */
+        _updateBindRow(room, true);
+    }
 }
 
 // ══════════════════════════════════════════
@@ -4580,6 +4861,71 @@ document.addEventListener('click', function(e) {
     const modal = document.getElementById('act-delete-modal');
     if (modal && modal.style.display === 'flex' && e.target === modal) closeActDeleteModal();
 });
+
+// ══════════════════════════════════════════
+// AUTO-DELETE EXPIRED ACTIVITIES
+// Silently deletes activities whose end time has passed.
+// Runs on page load (activities page) and every 60 seconds.
+// ══════════════════════════════════════════
+(function() {
+    /* Only run on the activities admin page */
+    if (window.location.pathname.indexOf('/admin/activities') === -1) return;
+
+    function parseTimeToday(str) {
+        if (!str) return null;
+        var m = str.trim().match(/(\d+):(\d+)\s*(AM|PM)/i);
+        if (!m) return null;
+        var h = parseInt(m[1]), min = parseInt(m[2]), mer = m[3].toUpperCase();
+        if (mer === 'PM' && h !== 12) h += 12;
+        if (mer === 'AM' && h === 12) h = 0;
+        var d = new Date();
+        d.setHours(h, min, 0, 0);
+        return d;
+    }
+
+    async function autoDeleteExpired() {
+        var now = new Date();
+        var rows = document.querySelectorAll('tbody tr');
+        var anyDeleted = false;
+
+        for (var i = 0; i < rows.length; i++) {
+            var cells = rows[i].querySelectorAll('td');
+            if (cells.length < 2) continue;
+            var timeSlot = cells[1].textContent.trim(); /* "10:00 AM - 11:00 AM" */
+            if (!timeSlot || timeSlot === '—') continue;
+
+            /* Announcements have no time slot — skip them */
+            var typeBadge = cells[2] ? cells[2].textContent.trim() : '';
+            if (typeBadge.toLowerCase().indexOf('announcement') !== -1) continue;
+
+            var parts = timeSlot.split('-');
+            var endStr = parts.length >= 2 ? parts[parts.length - 1].trim() : null;
+            if (!endStr) continue;
+
+            var endTime = parseTimeToday(endStr);
+            if (endTime && now > endTime) {
+                /* Extract id from the delete button onclick */
+                var btn = rows[i].querySelector('button[onclick*="deleteActivity"]');
+                if (!btn) continue;
+                var match = btn.getAttribute('onclick').match(/deleteActivity\((\d+)\)/);
+                if (!match) continue;
+                var id = match[1];
+                /* Silent delete — no confirm dialog, no modal */
+                try {
+                    await fetch('/admin/activities/' + id, { method: 'DELETE' });
+                    anyDeleted = true;
+                } catch(e) {}
+            }
+        }
+
+        if (anyDeleted) location.reload();
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        autoDeleteExpired();
+        setInterval(autoDeleteExpired, 60000); /* check every 60 seconds */
+    });
+})();
 
 // ══════════════════════════════════════════
 // Services
@@ -5956,6 +6302,101 @@ function toggleAdminTheme() {
         if (btn) { btn.textContent = '☀️'; btn.title = 'Switch to Light Theme'; }
     }
 })();
+
+// ══════════════════════════════════════════
+// Food Menu Card Upload
+// ══════════════════════════════════════════
+function onMenuCardSelected(input) {
+    const file = input.files[0];
+    if (!file) return;
+    const zone       = document.getElementById('menu-card-zone');
+    const iconEl     = document.getElementById('menu-card-zone-icon');
+    const textEl     = document.getElementById('menu-card-zone-text');
+    const chosenEl   = document.getElementById('menu-card-filename-chosen');
+    const uploadBtn  = document.getElementById('menu-card-upload-btn');
+    const previewWrap = document.getElementById('menu-card-preview-wrap');
+    const previewImg  = document.getElementById('menu-card-preview-img');
+
+    zone.classList.add('has-file');
+    iconEl.textContent = '✅';
+    textEl.textContent = 'File selected!';
+    chosenEl.textContent = file.name;
+    uploadBtn.disabled = false;
+
+    if (file.type.startsWith('image/')) {
+        previewImg.src = URL.createObjectURL(file);
+        previewWrap.style.display = 'block';
+    } else {
+        previewWrap.style.display = 'none';
+    }
+}
+
+document.getElementById('menu-card-form')?.addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const btn   = document.getElementById('menu-card-upload-btn');
+    const toast = document.getElementById('menu-card-toast');
+    const input = document.getElementById('menu-card-input');
+    if (!input.files[0]) return;
+
+    btn.textContent = 'Uploading…'; btn.disabled = true;
+
+    const formData = new FormData();
+    formData.append('menu_card', input.files[0]);
+
+    try {
+        const res  = await fetch('/admin/food/menu-card/upload', { method: 'POST', body: formData });
+        const data = await res.json();
+        if (res.ok && data.url) {
+            toast.style.display    = 'block';
+            toast.style.background = 'rgba(26,188,156,0.12)';
+            toast.style.color      = '#0e9c7e';
+            toast.style.border     = '1px solid rgba(26,188,156,0.25)';
+            toast.textContent      = '✓ Menu card uploaded successfully!';
+
+            const wrap   = document.getElementById('current-menu-card-wrap');
+            const thumb  = document.getElementById('menu-card-thumb');
+            const nameEl = document.getElementById('menu-card-filename');
+            const updEl  = document.getElementById('menu-card-updated');
+            wrap.style.display  = 'block';
+            nameEl.textContent  = data.url.split('/').pop();
+            updEl.textContent   = 'Last updated: Just now';
+            if (data.url.match(/\.(jpg|jpeg|png|webp)$/i)) {
+                thumb.innerHTML = `<img src="${data.url}" style="width:100%;height:100%;object-fit:cover;">`;
+            } else {
+                thumb.innerHTML = '📄';
+            }
+            btn.textContent = '⬆️ Upload Menu Card';
+        } else {
+            throw new Error(data.error || 'Upload failed');
+        }
+    } catch(err) {
+        toast.style.display    = 'block';
+        toast.style.background = 'rgba(231,76,60,0.1)';
+        toast.style.color      = '#c0392b';
+        toast.style.border     = '1px solid rgba(231,76,60,0.2)';
+        toast.textContent      = '✕ ' + err.message;
+        btn.textContent = '⬆️ Upload Menu Card';
+        btn.disabled = false;
+    }
+    setTimeout(() => { toast.style.display = 'none'; }, 4000);
+});
+
+async function deleteMenuCard() {
+    if (!confirm('Remove the current menu card? Guests will no longer be able to view it.')) return;
+    try {
+        const res = await fetch('/admin/food/menu-card/delete', { method: 'POST' });
+        if (res.ok) {
+            document.getElementById('current-menu-card-wrap').style.display = 'none';
+            const toast = document.getElementById('menu-card-toast');
+            toast.style.display    = 'block';
+            toast.style.background = 'rgba(231,76,60,0.1)';
+            toast.style.color      = '#c0392b';
+            toast.style.border     = '1px solid rgba(231,76,60,0.2)';
+            toast.textContent      = '🗑️ Menu card removed.';
+            setTimeout(() => { toast.style.display = 'none'; }, 3000);
+        } else { alert('Failed to delete menu card.'); }
+    } catch(e) { alert('Network error.'); }
+}
 
 </script>
 
